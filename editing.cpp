@@ -7,6 +7,36 @@
 #include <opentimelineio/stackAlgorithm.h>
 #include <stdlib.h>
 
+using otio = opentimelineio::OPENTIMELINEIO_VERSION;
+
+std::string ColorToName(const otio::Color& c)
+{
+    auto v = c.to_float_list();
+
+    double r = v[0], g = v[1], b = v[2];
+
+    auto close = [](double a, double b) {
+        return std::abs(a - b) < 0.01;
+    };
+
+    if (close(r,1.0) && close(g,1.0) && close(b,0.0)) return "YELLOW";
+    if (close(r,1.0) && close(g,0.0) && close(b,0.0)) return "RED";
+    if (close(r,0.0) && close(g,1.0) && close(b,0.0)) return "GREEN";
+    if (close(r,0.0) && close(g,0.0) && close(b,1.0)) return "BLUE";
+
+    return "WHITE";
+}
+
+otio::Color NameToColor(const std::string& name)
+{
+    if (name == "YELLOW") return otio::Color::from_float_list({1.0,1.0,0.0,1.0});
+    if (name == "RED")    return otio::Color::from_float_list({1.0,0.0,0.0,1.0});
+    if (name == "GREEN")  return otio::Color::from_float_list({0.0,1.0,0.0,1.0});
+    if (name == "BLUE")   return otio::Color::from_float_list({0.0,0.0,1.0,1.0});
+
+    return otio::Color::from_float_list({1.0,1.0,1.0,1.0});
+}
+
 void DeleteSelectedObject() {
     if (!appState.selected_object) {
         return;
@@ -325,6 +355,14 @@ std::string GetItemColor(otio::Item* item)
 {
     std::string item_color = "";
 
+    // ✅ Use official OTIO Color schema
+    auto c = item->color();
+    if (c)
+    {
+        return ColorToName(*c);
+    }
+
+    // ✅ Fallback to Raven legacy metadata
     if (item->metadata().has_key("raven") &&
         item->metadata()["raven"].type() == typeid(otio::AnyDictionary))
     {
@@ -342,6 +380,10 @@ std::string GetItemColor(otio::Item* item)
 
 void SetItemColor(otio::Item* item, std::string color_name)
 {
+    auto c = NameToColor(color_name);
+    item->set_color(c);
+
+    // Optionally keep Raven's legacy field in sync for backward compatibility
     otio::AnyDictionary raven_md;
     if (item->metadata().has_key("raven") &&
         item->metadata()["raven"].type() == typeid(otio::AnyDictionary))
